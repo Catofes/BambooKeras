@@ -393,16 +393,23 @@ def prepare_data(input_data):
         if i >= 2500:
             break
         X[i] = convert_row(s)
-        Y[i] = 0
+        Y[i][0] = 1
 
     for i, b in enumerate(background):
         if i >= 2500:
             break
         X[i + 2500] = convert_row(b)
-        Y[i + 2500] = 1
+        Y[i + 2500][1] = 1
 
     print("Load Data Finished.")
     return X, Y
+
+
+def s(input):
+    if input[0]:
+        return 1
+    else:
+        return 0
 
 
 def train(input_data):
@@ -436,7 +443,8 @@ def train(input_data):
             ind = np.random.randint(0, len(X_val))
             rowX, rowy = X_val[np.array([ind])], Y_val[np.array([ind])]
             preds = model.predict(rowX, verbose=0)
-            print('Except', [rowy, rowy, rowy])
+            preds = [s(preds[0]), s(preds[1]), s(preds[2])]
+            print('Except', [s(rowy), s(rowy), s(rowy)])
             print('Answer', preds)
             print('---')
 
