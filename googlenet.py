@@ -404,15 +404,6 @@ def prepare_data(input_data):
     print("Load Data Finished.")
     return X, Y
 
-
-def s(input):
-    print(input.shape)
-    if input[0] == 1:
-        return 1
-    else:
-        return 0
-
-
 def train(input_data):
     model = create_googlenet()
     sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
@@ -444,8 +435,8 @@ def train(input_data):
             ind = np.random.randint(0, len(X_val))
             rowX, rowy = X_val[np.array([ind])], Y_val[np.array([ind])]
             preds = model.predict(rowX, verbose=0)
-            preds = [s(preds[0]), s(preds[1]), s(preds[2])]
-            print('Except', [s(rowy), s(rowy), s(rowy)])
+            preds = [np.argmax(preds[0]), np.argmax(preds[1]), np.argmax(preds[2])]
+            print('Except', [np.argmax(rowy), np.argmax(rowy), np.argmax(rowy)])
             print('Answer', preds)
             print('---')
 
