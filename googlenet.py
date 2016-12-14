@@ -2,6 +2,7 @@ import numpy as np
 import time
 import json
 import argparse
+import signal
 from scipy.misc import imread, imresize
 
 from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, AveragePooling2D, ZeroPadding2D, Dropout, Flatten, \
