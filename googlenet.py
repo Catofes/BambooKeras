@@ -406,7 +406,8 @@ def prepare_data(input_data):
 
 
 def s(input):
-    if input[0]:
+    print(input.shape)
+    if input[0] == 1:
         return 1
     else:
         return 0
