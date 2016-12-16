@@ -512,7 +512,7 @@ class train:
                 print('Answer', preds)
                 print('---')
 
-        model.save(save_path)
+        model.save_weights(save_path)
 
 
 t = train()
