@@ -399,15 +399,19 @@ class train:
             X[0] = self.convert_row(row)
             result = np.argmax(model.predict(X)[0])
             if result == 0:
+                print("s/s")
                 signal_signal += 1
             else:
+                print("s/b")
                 signal_background += 1
         for row in background:
             X[0] = self.convert_row(row)
             result = np.argmax(model.predict(X)[0])
             if result == 0:
+                print("b/s")
                 background_signal += 1
             else:
+                print("b/b")
                 background_background += 1
         print("\tSignal\tBackground")
         print("Signal\t%s\t%s" % (signal_signal, signal_background))
