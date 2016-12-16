@@ -520,4 +520,4 @@ if __name__ == "__main__":
         signal.signal(signal.SIGINT, signal_handler)
         t.train(args.input, args.save)
     else:
-        t.test(args.input, args.input)
+        t.test(args.input, args.save)
