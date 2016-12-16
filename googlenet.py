@@ -380,6 +380,39 @@ class train:
         print("Finish Predict:", time.time())
         print(np.argmax(out[0]), np.argmax(out[1]), np.argmax(out[2]))
 
+    def test(self, input_data, input_network):
+        model = self.create_googlenet(input_network)
+        sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
+        model.compile(optimizer=sgd, loss='categorical_crossentropy')
+        print("Load Data.")
+        f = open(input_data, "r")
+        data = json.loads(f.read())
+        signal = data['signal']
+        background = data['background']
+        print("Test Data")
+        signal_signal = 0
+        signal_background = 0
+        background_signal = 0
+        background_background = 0
+        X = np.zeros((1, 3, 224, 224), dtype='float32')
+        for row in signal:
+            X[0] = self.convert_row(row)
+            result = np.argmax(model.predict(X)[0])
+            if result == 0:
+                signal_signal += 1
+            else:
+                signal_background += 1
+        for row in background:
+            X[0] = self.convert_row(row)
+            result = np.argmax(model.predict(X)[0])
+            if result == 0:
+                background_signal += 1
+            else:
+                background_background += 1
+        print("\tSignal\tBackground")
+        print("Signal\t%s\t%s" % (signal_signal, signal_background))
+        print("Background\t%s\t%s" % (background_signal, background_background))
+
     def convert_row(self, input_data):
         row = np.zeros((3, 224, 224))
         cluster_xy_data = input_data[0]
@@ -479,8 +512,12 @@ def signal_handler(signum, frame):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("-t", "--type", choice=["train", "test"])
     parser.add_argument("-i", "--input", required=True)
     parser.add_argument("-s", "--save", required=True)
     args = parser.parse_args()
-    signal.signal(signal.SIGINT, signal_handler)
-    t.train(args.input, args.save)
+    if args.type == "train":
+        signal.signal(signal.SIGINT, signal_handler)
+        t.train(args.input, args.save)
+    else:
+        t.test(args.input, args.input)
