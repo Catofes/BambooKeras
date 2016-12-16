@@ -1,10 +1,10 @@
 import numpy as np
 import time
+import random
 import json
 import argparse
 import signal
-from scipy.misc import imread, imresize
-
+import math
 from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, AveragePooling2D, ZeroPadding2D, Dropout, Flatten, \
     merge, Reshape, Activation
 from keras.models import Model
@@ -14,7 +14,109 @@ from keras.engine.training import slice_X
 from googlenet_custom_layers import PoolHelper, LRN
 
 
-class train:
+class DataGenerator:
+    def __init__(self, input_data_path, batch_size=256, test_data_percent=0.1, background_signal_equivalent=True):
+        print("Load Data From %s." % input_data_path)
+        f = open(input_data_path, "r")
+        data = json.loads(f.read())
+        self._signal = data['signal']
+        self._background = data['background']
+        self._data = []
+        if not background_signal_equivalent:
+            print("Load %s signal, %s background" % (len(self._signal), len(self._background)))
+            for s in self._signal:
+                self._data.append((s, 0))
+            for b in self._background:
+                self._data.append((b, 1))
+        else:
+            size = min(len(self._signal), len(self._background))
+            print("Load %s signal, %s background" % (size, size))
+            for i in range(0, size):
+                self._data.append((self._signal[i], 0))
+            for i in range(0, size):
+                self._data.append((self._background[i], 1))
+        print("Totally load %s data." % len(self._data))
+        random.shuffle(self._data)
+        split_at = int(math.floor(len(self._data) * (1 - test_data_percent)))
+        self._train_data = self._data[:split_at]
+        self._test_data = self._data[split_at:]
+        self._batch_size = batch_size
+        self._train_pointer = 0
+        self._test_pointer = 0
+
+    def get_train_size(self):
+        return len(self._train_data)
+
+    def get_test_size(self):
+        return len(self._test_data)
+
+    def get_batch_size(self):
+        return self._batch_size
+
+    @staticmethod
+    def _convert_row(input_row):
+        row = np.zeros((3, 224, 224))
+        cluster_xy_data = input_row[0]
+        for pixel, energy in cluster_xy_data.items():
+            location = pixel.split(":")
+            location_x = int(location[0])
+            location_y = int(location[1])
+            location_x += 224 / 2
+            location_y += 224 / 2
+            if not (0 <= location_x < 224 and 0 <= location_y < 224):
+                continue
+            row[0, location_x, location_y] = energy
+        cluster_zy_data = input_row[1]
+        for pixel, energy in cluster_zy_data.items():
+            location = pixel.split(":")
+            location_z = int(location[0])
+            location_y = int(location[1])
+            location_z += 224 / 2
+            location_y += 224 / 2
+            if not (0 <= location_z < 224 and 0 <= location_y < 224):
+                continue
+            row[1, location_z, location_y] = energy
+        return row
+
+    def train_generator(self):
+        start = self._train_pointer
+        end = self._train_pointer + self._batch_size
+        if end >= len(self._train_data):
+            end = len(self._train_data)
+            self._train_pointer = 0
+        data = self._train_data[start:end]
+        result_x = np.zeros((self._batch_size, 3, 224, 224), dtype='float32')
+        result_y = np.zeros((self._batch_size, 1000))
+        for i, row in enumerate(data):
+            result_x[i] = self._convert_row(row[0])
+            result_y[i][row[1]] = 1
+        return result_x, [result_y, result_y, result_y]
+
+    def test_generator(self):
+        start = self._test_pointer
+        end = self._test_pointer + self._batch_size
+        if end >= len(self._test_data):
+            end = len(self._test_data)
+            self._test_pointer = 0
+        data = self._test_data[start:end]
+        result_x = np.zeros((self._batch_size, 3, 224, 224), dtype='float32')
+        result_y = np.zeros((self._batch_size, 1000))
+        for i, row in enumerate(data):
+            result_x[i] = self._convert_row(row[0])
+            result_y[i][row[1]] = 1
+        return result_x, [result_y, result_y, result_y]
+
+    def get_some_test(self, size):
+        result_x = np.zeros((size, 3, 224, 224), dtype='float32')
+        result_y = np.zeros((size, 1000))
+        for i in range(0, size):
+            row = random.choice(self._test_data)
+            result_x[i] = self._convert_row(row)
+            result_y[i][row[1]] = 1
+        return result_x, [result_y, result_y, result_y]
+
+
+class Train:
     def __init__(self):
         self.google_net = None
         self.exit_signal = False
@@ -361,24 +463,9 @@ class train:
         self.google_net = googlenet
         return googlenet
 
-    def predict(self):
-        img = imresize(imread('cat.jpg', mode='RGB'), (224, 224)).astype(np.float32)
-        img[:, :, 0] -= 123.68
-        img[:, :, 1] -= 116.779
-        img[:, :, 2] -= 103.939
-        img[:, :, [0, 1, 2]] = img[:, :, [2, 1, 0]]
-        img = img.transpose((2, 0, 1))
-        img = np.expand_dims(img, axis=0)
-
-        # Test pretrained model
-        model = self.create_googlenet('googlenet_weights.h5')
-        sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
-        print("Start Compile:", time.time())
-        model.compile(optimizer=sgd, loss='categorical_crossentropy')
-        print("Start Predict:", time.time())
-        out = model.predict(img)  # note: the model has three outputs
-        print("Finish Predict:", time.time())
-        print(np.argmax(out[0]), np.argmax(out[1]), np.argmax(out[2]))
+    def predict(self, x):
+        preds = self.google_net.predict(x)
+        return [np.argmax(preds[0]), np.argmax(preds[1]), np.argmax(preds[2])]
 
     def test(self, input_data, input_network):
         model = self.create_googlenet(input_network)
@@ -426,97 +513,33 @@ class train:
         print("Signal\t%s\t%s" % (signal_signal, signal_background))
         print("Background\t%s\t%s" % (background_signal, background_background))
 
-    def convert_row(self, input_data):
-        row = np.zeros((3, 224, 224))
-        cluster_xy_data = input_data[0]
-        for pixel, energy in cluster_xy_data.items():
-            location = pixel.split(":")
-            location_x = int(location[0])
-            location_y = int(location[1])
-            location_x += 224 / 2
-            location_y += 224 / 2
-            if not (0 <= location_x < 224 and 0 <= location_y < 224):
-                continue
-            row[0, location_x, location_y] = energy
-        cluster_zy_data = input_data[1]
-        for pixel, energy in cluster_zy_data.items():
-            location = pixel.split(":")
-            location_z = int(location[0])
-            location_y = int(location[1])
-            location_z += 224 / 2
-            location_y += 224 / 2
-            if not (0 <= location_z < 224 and 0 <= location_y < 224):
-                continue
-            row[1, location_z, location_y] = energy
-        return row
-
-    def prepare_data(self, input_data):
-        print("Load Data.")
-        f = open(input_data, "r")
-        data = json.loads(f.read())
-        signal = data['signal']
-        background = data['background']
-        print("Total %s Event" % (len(signal) + len(background)))
-        X = np.zeros((5000, 3, 224, 224), dtype='float32')
-        Y = np.zeros((5000, 1000), dtype='float32')
-        for i, s in enumerate(signal):
-            if i >= 2500:
-                break
-            X[i] = self.convert_row(s)
-            Y[i][0] = 1
-
-        for i, b in enumerate(background):
-            if i >= 2500:
-                break
-            X[i + 2500] = self.convert_row(b)
-            Y[i + 2500][1] = 1
-
-        print("Load Data Finished.")
-        return X, Y
-
-    def train(self, input_data, save_path):
-        model = self.create_googlenet()
+    def train(self, input_data, save_path, recovery=None):
+        if recovery:
+            model = self.create_googlenet(recovery)
+        else:
+            model = self.create_googlenet()
         sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
         model.compile(optimizer=sgd, loss='categorical_crossentropy')
 
-        X, Y = self.prepare_data(input_data)
-        # Random Data List
-        indices = np.arange(len(Y))
-        np.random.shuffle(indices)
-        X = X[indices]
-        Y = Y[indices]
-
-        # Split 10% as test data
-        split_at = len(X) - len(X) / 10
-        (X_train, X_val) = (slice_X(X, 0, split_at), slice_X(X, split_at))
-        (Y_train, Y_val) = (Y[:split_at], Y[split_at:])
-        print("X shape: ", X_train.shape)
-        print("Y shape: ", Y_train.shape)
-
+        data = DataGenerator(input_data)
         print("Start Train.")
         for i in range(0, 10000):
             if self.exit_signal:
                 break
             print("=" * 64)
             print("Loop %s" % i)
-            model.fit(X_train, [Y_train, Y_train, Y_train], batch_size=128, nb_epoch=1,
-                      validation_data=(X_val, [Y_val, Y_val, Y_val]))
-
+            model.fit_generator(generator=data.train_generator, samples_per_epoch=data.get_train_size(), nb_epoch=1,
+                                validation_data=data.test_generator, nb_val_samples=data.get_test_size())
             # print some test:
             for i in range(10):
-                ind = np.random.randint(0, len(X_val))
-                rowX, rowy = X_val[np.array([ind])], Y_val[np.array([ind])]
-                preds = model.predict(rowX, verbose=0)
-                preds = [np.argmax(preds[0]), np.argmax(preds[1]), np.argmax(preds[2])]
-                print('Except', [np.argmax(rowy), np.argmax(rowy), np.argmax(rowy)])
-                print('Answer', preds)
+                row_x, row_y = data.get_some_test(1)
+                predict = self.predict(row_x)
+                print('Except', [np.argmax(row_y[0]), np.argmax(row_y[0]), np.argmax(row_y[0])])
+                print('Answer', predict)
                 print('---')
-
         model.save_weights(save_path)
 
-
-t = train()
-
+t = Train()
 
 def signal_handler(signum, frame):
     print("Try to save train data. It may take a long time")
@@ -528,9 +551,13 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--type", choices=["train", "test"])
     parser.add_argument("-i", "--input", required=True)
     parser.add_argument("-s", "--save", required=True)
+    parser.add_argument("-r", "--recovery")
     args = parser.parse_args()
     if args.type == "train":
         signal.signal(signal.SIGINT, signal_handler)
-        t.train(args.input, args.save)
+        if args.recovery:
+            t.train(args.input, args.save, args.recovery)
+        else:
+            t.train(args.input, args.save)
     else:
         t.test(args.input, args.save)
