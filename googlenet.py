@@ -394,12 +394,12 @@ class train:
         signal_background = 0
         background_signal = 0
         background_background = 0
-        X = np.zeros((1, 3, 224, 224), dtype='float32')
         for i, row in enumerate(signal):
             if i >= 2500:
                 break
-            X[0] = self.convert_row(row)
-            preds = model.predict(X)
+            x = self.convert_row(row)
+            x = np.expand_dims(x, axis=0)
+            preds = model.predict(x)
             print([np.argmax(preds[0]), np.argmax(preds[1]), np.argmax(preds[2])])
             result = np.argmax(preds[0])
             if result == 0:
@@ -411,8 +411,9 @@ class train:
         for i, row in enumerate(background):
             if i >= 2500:
                 break
-            X[0] = self.convert_row(row)
-            preds = model.predict(X)
+            x = self.convert_row(row)
+            x = np.expand_dims(x, axis=0)
+            preds = model.predict(x)
             print([np.argmax(preds[0]), np.argmax(preds[1]), np.argmax(preds[2])])
             result = np.argmax(preds[0])
             if result == 0:
