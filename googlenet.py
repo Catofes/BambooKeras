@@ -512,7 +512,7 @@ def signal_handler(signum, frame):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--type", choice=["train", "test"])
+    parser.add_argument("-t", "--type", choices=["train", "test"])
     parser.add_argument("-i", "--input", required=True)
     parser.add_argument("-s", "--save", required=True)
     args = parser.parse_args()
