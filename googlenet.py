@@ -395,23 +395,31 @@ class train:
         background_signal = 0
         background_background = 0
         X = np.zeros((1, 3, 224, 224), dtype='float32')
-        for row in signal:
+        for i, row in enumerate(signal):
+            if i >= 2500:
+                break
             X[0] = self.convert_row(row)
-            result = np.argmax(model.predict(X)[0])
+            preds = model.predict(X)
+            print([np.argmax(preds[0]), np.argmax(preds[1]), np.argmax(preds[2])])
+            result = np.argmax(preds[0])
             if result == 0:
-                print("s/s")
+                print("%s: s/s" % i)
                 signal_signal += 1
             else:
-                print("s/b")
+                print("%s: s/b" % i)
                 signal_background += 1
-        for row in background:
+        for i, row in enumerate(background):
+            if i >= 2500:
+                break
             X[0] = self.convert_row(row)
-            result = np.argmax(model.predict(X)[0])
+            preds = model.predict(X)
+            print([np.argmax(preds[0]), np.argmax(preds[1]), np.argmax(preds[2])])
+            result = np.argmax(preds[0])
             if result == 0:
-                print("b/s")
+                print("%s: b/s" % i)
                 background_signal += 1
             else:
-                print("b/b")
+                print("%s: b/b" % i)
                 background_background += 1
         print("\tSignal\tBackground")
         print("Signal\t%s\t%s" % (signal_signal, signal_background))
@@ -503,7 +511,7 @@ class train:
                 print('Answer', preds)
                 print('---')
 
-        self.google_net.save(save_path)
+        model.save(save_path)
 
 
 t = train()
