@@ -79,32 +79,38 @@ class DataGenerator:
         return row
 
     def train_generator(self):
-        start = self._train_pointer
-        end = self._train_pointer + self._batch_size
-        if end >= len(self._train_data):
-            end = len(self._train_data)
-            self._train_pointer = 0
-        data = self._train_data[start:end]
-        result_x = np.zeros((self._batch_size, 3, 224, 224), dtype='float32')
-        result_y = np.zeros((self._batch_size, 1000))
-        for i, row in enumerate(data):
-            result_x[i] = self._convert_row(row[0])
-            result_y[i][row[1]] = 1
-        return result_x, [result_y, result_y, result_y]
+        while True:
+            start = self._train_pointer
+            end = self._train_pointer + self._batch_size
+            if end >= len(self._train_data):
+                end = len(self._train_data)
+                self._train_pointer = 0
+            else:
+                self._train_pointer = end
+            data = self._train_data[start:end]
+            result_x = np.zeros((self._batch_size, 3, 224, 224), dtype='float32')
+            result_y = np.zeros((self._batch_size, 1000))
+            for i, row in enumerate(data):
+                result_x[i] = self._convert_row(row[0])
+                result_y[i][row[1]] = 1
+            yield result_x, [result_y, result_y, result_y]
 
     def test_generator(self):
-        start = self._test_pointer
-        end = self._test_pointer + self._batch_size
-        if end >= len(self._test_data):
-            end = len(self._test_data)
-            self._test_pointer = 0
-        data = self._test_data[start:end]
-        result_x = np.zeros((self._batch_size, 3, 224, 224), dtype='float32')
-        result_y = np.zeros((self._batch_size, 1000))
-        for i, row in enumerate(data):
-            result_x[i] = self._convert_row(row[0])
-            result_y[i][row[1]] = 1
-        return result_x, [result_y, result_y, result_y]
+        while True:
+            start = self._test_pointer
+            end = self._test_pointer + self._batch_size
+            if end >= len(self._test_data):
+                end = len(self._test_data)
+                self._test_pointer = 0
+            else:
+                self._train_pointer = end
+            data = self._test_data[start:end]
+            result_x = np.zeros((self._batch_size, 3, 224, 224), dtype='float32')
+            result_y = np.zeros((self._batch_size, 1000))
+            for i, row in enumerate(data):
+                result_x[i] = self._convert_row(row[0])
+                result_y[i][row[1]] = 1
+            yield result_x, [result_y, result_y, result_y]
 
     def get_some_test(self, size):
         result_x = np.zeros((size, 3, 224, 224), dtype='float32')
@@ -528,8 +534,8 @@ class Train:
                 break
             print("=" * 64)
             print("Loop %s" % i)
-            model.fit_generator(generator=data.train_generator, samples_per_epoch=data.get_train_size(), nb_epoch=1,
-                                validation_data=data.test_generator, nb_val_samples=data.get_test_size())
+            model.fit_generator(generator=data.train_generator(), samples_per_epoch=data.get_train_size(), nb_epoch=1,
+                                validation_data=data.test_generator(), nb_val_samples=data.get_test_size())
             # print some test:
             for i in range(10):
                 row_x, row_y = data.get_some_test(1)
@@ -539,7 +545,9 @@ class Train:
                 print('---')
         model.save_weights(save_path)
 
+
 t = Train()
+
 
 def signal_handler(signum, frame):
     print("Try to save train data. It may take a long time")
