@@ -79,38 +79,38 @@ class DataGenerator:
         return row
 
     def train_generator(self):
-        while True:
-            start = self._train_pointer
-            end = self._train_pointer + self._batch_size
-            if end >= len(self._train_data):
-                end = len(self._train_data)
-                self._train_pointer = 0
-            else:
-                self._train_pointer = end
-            data = self._train_data[start:end]
-            result_x = np.zeros((self._batch_size, 3, 224, 224), dtype='float32')
-            result_y = np.zeros((self._batch_size, 1000))
-            for i, row in enumerate(data):
-                result_x[i] = self._convert_row(row[0])
-                result_y[i][row[1]] = 1
-            yield result_x, [result_y, result_y, result_y]
+        # while True:
+        start = self._train_pointer
+        end = self._train_pointer + self._batch_size
+        if end >= len(self._train_data):
+            end = len(self._train_data)
+            self._train_pointer = 0
+        else:
+            self._train_pointer = end
+        data = self._train_data[start:end]
+        result_x = np.zeros((self._batch_size, 3, 224, 224), dtype='float32')
+        result_y = np.zeros((self._batch_size, 1000))
+        for i, row in enumerate(data):
+            result_x[i] = self._convert_row(row[0])
+            result_y[i][row[1]] = 1
+        return result_x, result_y
 
     def test_generator(self):
-        while True:
-            start = self._test_pointer
-            end = self._test_pointer + self._batch_size
-            if end >= len(self._test_data):
-                end = len(self._test_data)
-                self._test_pointer = 0
-            else:
-                self._train_pointer = end
-            data = self._test_data[start:end]
-            result_x = np.zeros((self._batch_size, 3, 224, 224), dtype='float32')
-            result_y = np.zeros((self._batch_size, 1000))
-            for i, row in enumerate(data):
-                result_x[i] = self._convert_row(row[0])
-                result_y[i][row[1]] = 1
-            yield result_x, [result_y, result_y, result_y]
+        # while True:
+        start = self._test_pointer
+        end = self._test_pointer + self._batch_size
+        if end >= len(self._test_data):
+            end = len(self._test_data)
+            self._test_pointer = 0
+        else:
+            self._train_pointer = end
+        data = self._test_data[start:end]
+        result_x = np.zeros((self._batch_size, 3, 224, 224), dtype='float32')
+        result_y = np.zeros((self._batch_size, 1000))
+        for i, row in enumerate(data):
+            result_x[i] = self._convert_row(row[0])
+            result_y[i][row[1]] = 1
+        return result_x, result_y
 
     def get_some_test(self, size):
         result_x = np.zeros((size, 3, 224, 224), dtype='float32')
@@ -119,7 +119,7 @@ class DataGenerator:
             row = random.choice(self._test_data)
             result_x[i] = self._convert_row(row)
             result_y[i][row[1]] = 1
-        return result_x, [result_y, result_y, result_y]
+        return result_x, result_y
 
 
 class Train:
@@ -534,9 +534,24 @@ class Train:
                 break
             print("=" * 64)
             print("Loop %s" % i)
-            model.fit_generator(generator=data.train_generator(), samples_per_epoch=data.get_train_size(), nb_epoch=1,
-                                validation_data=data.test_generator(), nb_val_samples=data.get_test_size())
-            # print some test:
+            # Train
+            samples_per_epoch = data.get_train_size()
+            while samples_per_epoch > 0:
+                row_x, row_y = data.train_generator()
+                samples_per_epoch -= len(row_x)
+                result = model.train_on_batch(row_x, [row_y, row_y, row_y])
+                print("Train batch: ", result)
+            # Test
+            test_per_epoch = data.get_test_size()
+            while test_per_epoch > 0:
+                row_x, row_y = data.test_generator()
+                test_per_epoch -= len(row_x)
+                result = model.test_on_batch(row_x, [row_y, row_y, row_y])
+                print("Test batch: ", result)
+
+            # model.fit_generator(generator=data.train_generator(), samples_per_epoch=data.get_train_size(), nb_epoch=1,
+            #                     validation_data=data.test_generator(), nb_val_samples=data.get_test_size())
+            # print some predict:
             for i in range(10):
                 row_x, row_y = data.get_some_test(1)
                 predict = self.predict(row_x)
