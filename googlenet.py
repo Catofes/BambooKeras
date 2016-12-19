@@ -15,7 +15,7 @@ from googlenet_custom_layers import PoolHelper, LRN
 
 
 class DataGenerator:
-    def __init__(self, input_data_path, batch_size=256, test_data_percent=0.1, background_signal_equivalent=True):
+    def __init__(self, input_data_path, batch_size=128, test_data_percent=0.1, background_signal_equivalent=True):
         print("Load Data From %s." % input_data_path)
         f = open(input_data_path, "r")
         data = json.loads(f.read())
