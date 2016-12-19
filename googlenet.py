@@ -103,7 +103,7 @@ class DataGenerator:
             end = len(self._test_data)
             self._test_pointer = 0
         else:
-            self._train_pointer = end
+            self._test_pointer = end
         data = self._test_data[start:end]
         result_x = np.zeros((self._batch_size, 3, 224, 224), dtype='float32')
         result_y = np.zeros((self._batch_size, 1000))
