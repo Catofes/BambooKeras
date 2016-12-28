@@ -21,6 +21,7 @@ class DataGenerator:
         data = json.loads(f.read())
         self._signal = data['signal']
         self._background = data['background']
+        self._max_energy = data['max_energy']
         self._data = []
         if not background_signal_equivalent:
             print("Load %s signal, %s background" % (len(self._signal), len(self._background)))
@@ -53,8 +54,7 @@ class DataGenerator:
     def get_batch_size(self):
         return self._batch_size
 
-    @staticmethod
-    def _convert_row(input_row):
+    def _convert_row(self, input_row):
         row = np.zeros((3, 224, 224))
         cluster_xy_data = input_row[0]
         for pixel, energy in cluster_xy_data.items():
@@ -65,7 +65,7 @@ class DataGenerator:
             location_y += 224 / 2
             if not (0 <= location_x < 224 and 0 <= location_y < 224):
                 continue
-            row[0, location_x, location_y] = energy
+            row[0, location_x, location_y] = int(math.floor(energy / self._max_energy * 256))
         cluster_zy_data = input_row[1]
         for pixel, energy in cluster_zy_data.items():
             location = pixel.split(":")
@@ -75,7 +75,7 @@ class DataGenerator:
             location_y += 224 / 2
             if not (0 <= location_z < 224 and 0 <= location_y < 224):
                 continue
-            row[1, location_z, location_y] = energy
+            row[1, location_z, location_y] = int(math.floor(energy / self._max_energy * 256))
         return row
 
     def train_generator(self):
