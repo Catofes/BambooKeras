@@ -7,6 +7,7 @@ cluster_x_size = 3
 cluster_y_size = 3
 cluster_z_size = 3
 
+
 def get_center(x, y, z, e):
     total_energy = 0
     total_x = 0
@@ -42,7 +43,14 @@ def cluster(x, y, z, e):
             cluster_zy_data[cluster_zy_id] += e[i]
         else:
             cluster_zy_data[cluster_zy_id] = e[i]
-    return cluster_xy_data, cluster_zy_data
+    max_e = 0
+    for k, v in cluster_xy_data.items():
+        if v > max_e:
+            max_e = v
+    for k, v in cluster_zy_data.items():
+        if v > max_e:
+            max_e = v
+    return cluster_xy_data, cluster_zy_data, max_e
 
 
 def convert(signal_path, background_path, output_path):
@@ -56,27 +64,34 @@ def convert(signal_path, background_path, output_path):
 
     output = {
         "signal": [],
-        "background": []
+        "background": [],
+        "max_energy": 0
     }
     output_signal = output['signal']
     output_background = output['background']
 
+    total_max_energy = 0
     count = 0
     total = signal_chain.GetEntries() + background_chain.GetEntries()
     for entry in signal_chain:
         if count % 1000 == 0:
             print("%s/%s" % (count, total))
-        cluster_xy_data, cluster_zy_data = cluster(entry.x, entry.y, entry.z, entry.e)
+        cluster_xy_data, cluster_zy_data, max_energy = cluster(entry.x, entry.y, entry.z, entry.e)
         output_signal.append((cluster_xy_data, cluster_zy_data))
         count += 1
+        if max_energy > total_max_energy:
+            total_max_energy = max_energy
 
     for entry in background_chain:
         if count % 1000 == 0:
             print("%s/%s" % (count, total))
-        cluster_xy_data, cluster_zy_data = cluster(entry.x, entry.y, entry.z, entry.e)
+        cluster_xy_data, cluster_zy_data, max_energy = cluster(entry.x, entry.y, entry.z, entry.e)
         output_background.append((cluster_xy_data, cluster_zy_data))
         count += 1
+        if max_energy > total_max_energy:
+            total_max_energy = max_energy
 
+    output["max_energy"] = total_max_energy
     f = open(output_path, "w")
     f.write(json.dumps(output))
     f.close()
