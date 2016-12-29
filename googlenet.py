@@ -79,45 +79,47 @@ class DataGenerator:
         return row
 
     def train_generator(self):
-        # while True:
-        start = self._train_pointer
-        end = self._train_pointer + self._batch_size
-        if end >= len(self._train_data):
-            end = len(self._train_data)
-            self._train_pointer = 0
-        else:
-            self._train_pointer = end
-        data = self._train_data[start:end]
-        result_x = np.zeros((self._batch_size, 3, 224, 224), dtype='float32')
-        result_y = np.zeros((self._batch_size, 1000))
-        for i, row in enumerate(data):
-            result_x[i] = self._convert_row(row[0])
-            result_y[i][row[1]] = 1
-        return result_x, result_y
+        while True:
+            start = self._train_pointer
+            end = self._train_pointer + self._batch_size
+            if end >= len(self._train_data):
+                end = len(self._train_data)
+                self._train_pointer = 0
+            else:
+                self._train_pointer = end
+            data = self._train_data[start:end]
+            count = len(data)
+            result_x = np.zeros((count, 3, 224, 224), dtype='float32')
+            result_y = np.zeros((count, 1000))
+            for i, row in enumerate(data):
+                result_x[i] = self._convert_row(row[0])
+                result_y[i][row[1]] = 1
+            yield result_x, [result_y, result_y, result_y]
 
     def test_generator(self):
-        # while True:
-        start = self._test_pointer
-        end = self._test_pointer + self._batch_size
-        if end >= len(self._test_data):
-            end = len(self._test_data)
-            self._test_pointer = 0
-        else:
-            self._test_pointer = end
-        data = self._test_data[start:end]
-        result_x = np.zeros((self._batch_size, 3, 224, 224), dtype='float32')
-        result_y = np.zeros((self._batch_size, 1000))
-        for i, row in enumerate(data):
-            result_x[i] = self._convert_row(row[0])
-            result_y[i][row[1]] = 1
-        return result_x, result_y
+        while True:
+            start = self._test_pointer
+            end = self._test_pointer + self._batch_size
+            if end >= len(self._test_data):
+                end = len(self._test_data)
+                self._test_pointer = 0
+            else:
+                self._test_pointer = end
+            data = self._test_data[start:end]
+            count = len(data)
+            result_x = np.zeros((count, 3, 224, 224), dtype='float32')
+            result_y = np.zeros((count, 1000))
+            for i, row in enumerate(data):
+                result_x[i] = self._convert_row(row[0])
+                result_y[i][row[1]] = 1
+            yield result_x, [result_y, result_y, result_y]
 
     def get_some_test(self, size):
         result_x = np.zeros((size, 3, 224, 224), dtype='float32')
         result_y = np.zeros((size, 1000))
         for i in range(0, size):
             row = random.choice(self._test_data)
-            result_x[i] = self._convert_row(row)
+            result_x[i] = self._convert_row(row[0])
             result_y[i][row[1]] = 1
         return result_x, result_y
 
@@ -477,20 +479,21 @@ class Train:
         model = self.create_googlenet(input_network)
         sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
         model.compile(optimizer=sgd, loss='categorical_crossentropy')
-        print("Load Data.")
-        f = open(input_data, "r")
-        data = json.loads(f.read())
-        signal = data['signal']
-        background = data['background']
+        # print("Load Data.")
+        # f = open(input_data, "r")
+        # data = json.loads(f.read())
+        # signal = data['signal']
+        # background = data['background']
+        data_generator = DataGenerator(input_data)
         print("Test Data")
         signal_signal = 0
         signal_background = 0
         background_signal = 0
         background_background = 0
-        for i, row in enumerate(signal):
+        for i, row in enumerate(data_generator._signal):
             if i >= 2500:
                 break
-            x = self.convert_row(row)
+            x = data_generator._convert_row(row)
             x = np.expand_dims(x, axis=0)
             preds = model.predict(x)
             print([np.argmax(preds[0]), np.argmax(preds[1]), np.argmax(preds[2])])
@@ -501,10 +504,10 @@ class Train:
             else:
                 print("%s: s/b" % i)
                 signal_background += 1
-        for i, row in enumerate(background):
+        for i, row in enumerate(data_generator._background):
             if i >= 2500:
                 break
-            x = self.convert_row(row)
+            x = data_generator._convert_row(row)
             x = np.expand_dims(x, axis=0)
             preds = model.predict(x)
             print([np.argmax(preds[0]), np.argmax(preds[1]), np.argmax(preds[2])])
@@ -534,28 +537,27 @@ class Train:
                 break
             print("=" * 64)
             print("Loop %s" % i)
-            # Train
-            samples_per_epoch = data.get_train_size()
-            while samples_per_epoch > 0:
-                row_x, row_y = data.train_generator()
-                samples_per_epoch -= len(row_x)
-                result = model.train_on_batch(row_x, [row_y, row_y, row_y])
-                print("Train batch: ", result)
-            # Test
-            test_per_epoch = data.get_test_size()
-            while test_per_epoch > 0:
-                row_x, row_y = data.test_generator()
-                test_per_epoch -= len(row_x)
-                result = model.test_on_batch(row_x, [row_y, row_y, row_y])
-                print("Test batch: ", result)
-
-            # model.fit_generator(generator=data.train_generator(), samples_per_epoch=data.get_train_size(), nb_epoch=1,
-            #                     validation_data=data.test_generator(), nb_val_samples=data.get_test_size())
+            # # Train
+            # samples_per_epoch = data.get_train_size()
+            # while samples_per_epoch > 0:
+            #     row_x, row_y = data.train_generator()
+            #     samples_per_epoch -= len(row_x)
+            #     result = model.train_on_batch(row_x, [row_y, row_y, row_y])
+            #     print("Train batch: ", result)
+            # # Test
+            # test_per_epoch = data.get_test_size()
+            # while test_per_epoch > 0:
+            #     row_x, row_y = data.test_generator()
+            #     test_per_epoch -= len(row_x)
+            #     result = model.test_on_batch(row_x, [row_y, row_y, row_y])
+            #     print("Test batch: ", result)
+            model.fit_generator(generator=data.train_generator(), samples_per_epoch=data.get_train_size(), nb_epoch=1,
+                                validatison_data=data.test_generator(), nb_val_samples=data.get_test_size())
             # print some predict:
-            for i in range(10):
+            for i in range(100):
                 row_x, row_y = data.get_some_test(1)
                 predict = self.predict(row_x)
-                print('Except', [np.argmax(row_y[0]), np.argmax(row_y[0]), np.argmax(row_y[0])])
+                print('Except', [np.argmax(row_y), np.argmax(row_y), np.argmax(row_y)])
                 print('Answer', predict)
                 print('---')
         model.save_weights(save_path)
