@@ -77,7 +77,7 @@ def convert(signal_path, background_path, output_path):
         if count % 1000 == 0:
             print("%s/%s" % (count, total))
         cluster_xy_data, cluster_zy_data, max_energy = cluster(entry.x, entry.y, entry.z, entry.e)
-        output_signal.append((cluster_xy_data, cluster_zy_data))
+        output_signal.append((cluster_xy_data, cluster_zy_data, max_energy))
         count += 1
         if max_energy > total_max_energy:
             total_max_energy = max_energy
@@ -86,7 +86,7 @@ def convert(signal_path, background_path, output_path):
         if count % 1000 == 0:
             print("%s/%s" % (count, total))
         cluster_xy_data, cluster_zy_data, max_energy = cluster(entry.x, entry.y, entry.z, entry.e)
-        output_background.append((cluster_xy_data, cluster_zy_data))
+        output_background.append((cluster_xy_data, cluster_zy_data, max_energy))
         count += 1
         if max_energy > total_max_energy:
             total_max_energy = max_energy
