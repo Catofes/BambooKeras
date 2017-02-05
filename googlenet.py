@@ -55,7 +55,7 @@ class DataGenerator:
     def get_batch_size(self):
         return self._batch_size
 
-    def _convert_row(self, input_row, row_max_energy):
+    def _convert_row(self, input_row):
         row = np.zeros((3, 224, 224))
         cluster_xy_data = input_row[0]
         for pixel, energy in cluster_xy_data.items():
@@ -69,7 +69,7 @@ class DataGenerator:
             if self._max_energy:
                 row[0, location_x, location_y] = min(int(math.floor(energy / self._max_energy * 256)), 255)
             else:
-                row[0, location_x, location_y] = min(int(math.floor(energy / row_max_energy * 256)), 255)
+                row[0, location_x, location_y] = min(int(math.floor(energy / input_row[2] * 256)), 255)
         cluster_zy_data = input_row[1]
         for pixel, energy in cluster_zy_data.items():
             location = pixel.split(":")
@@ -82,7 +82,7 @@ class DataGenerator:
             if self._max_energy:
                 row[1, location_z, location_y] = min(int(math.floor(energy / self._max_energy * 256)), 255)
             else:
-                row[0, location_z, location_y] = min(int(math.floor(energy / row_max_energy * 256)), 255)
+                row[0, location_z, location_y] = min(int(math.floor(energy / input_row[2] * 256)), 255)
         return row
 
     def train_generator(self):
@@ -99,7 +99,7 @@ class DataGenerator:
             result_x = np.zeros((count, 3, 224, 224), dtype='float32')
             result_y = np.zeros((count, 1000))
             for i, row in enumerate(data):
-                result_x[i] = self._convert_row(row[0], row[2])
+                result_x[i] = self._convert_row(row[0])
                 result_y[i][row[1]] = 1
             yield result_x, [result_y, result_y, result_y]
 
@@ -117,7 +117,7 @@ class DataGenerator:
             result_x = np.zeros((count, 3, 224, 224), dtype='float32')
             result_y = np.zeros((count, 1000))
             for i, row in enumerate(data):
-                result_x[i] = self._convert_row(row[0], row[2])
+                result_x[i] = self._convert_row(row[0])
                 result_y[i][row[1]] = 1
             yield result_x, [result_y, result_y, result_y]
 
@@ -126,7 +126,7 @@ class DataGenerator:
         result_y = np.zeros((size, 1000))
         for i in range(0, size):
             row = random.choice(self._test_data)
-            result_x[i] = self._convert_row(row[0], row[2])
+            result_x[i] = self._convert_row(row[0])
             result_y[i][row[1]] = 1
         return result_x, result_y
 
