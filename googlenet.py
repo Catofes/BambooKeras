@@ -1,16 +1,14 @@
 import numpy as np
-import time
 import random
 import json
 import argparse
 import signal
 import math
 from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, AveragePooling2D, ZeroPadding2D, Dropout, Flatten, \
-    merge, Reshape, Activation
+    merge, Activation
 from keras.models import Model
 from keras.regularizers import l2
 from keras.optimizers import SGD
-from keras.engine.training import slice_X
 from googlenet_custom_layers import PoolHelper, LRN
 
 
@@ -604,6 +602,6 @@ if __name__ == "__main__":
         if args.recovery:
             t.train(args.save, args.recovery)
         else:
-            t.train(args.input, args.save)
+            t.train(args.save)
     else:
-        t.test(args.input, args.save)
+        t.test(args.save)
