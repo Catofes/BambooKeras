@@ -60,29 +60,33 @@ class DataGenerator:
         cluster_xy_data = input_row[0]
         for pixel, energy in cluster_xy_data.items():
             location = pixel.split(":")
-            location_x = int(location[0])
-            location_y = int(location[1])
-            location_x += 224 / 2
-            location_y += 224 / 2
-            if not (0 <= location_x < 224 and 0 <= location_y < 224):
-                continue
-            if self._max_energy:
-                row[0, location_x, location_y] = min(int(math.floor(energy / self._max_energy * 256)), 255)
-            else:
-                row[0, location_x, location_y] = min(int(math.floor(energy / input_row[2] * 256)), 255)
+            location_x = int(location[0]) * 4
+            location_y = int(location[1]) * 4
+            for i in range(0, 4):
+                for j in range(0, 4):
+                    _location_x = location_x + 224 / 2 + i
+                    _location_y = location_y + 224 / 2 + j
+                    if not (0 <= _location_x < 224 and 0 <= _location_y < 224):
+                        continue
+                    if self._max_energy:
+                        row[0, _location_x, _location_y] = min(int(math.floor(energy / self._max_energy * 256)), 255)
+                    else:
+                        row[0, _location_x, _location_y] = min(int(math.floor(energy / input_row[2] * 256)), 255)
         cluster_zy_data = input_row[1]
         for pixel, energy in cluster_zy_data.items():
             location = pixel.split(":")
-            location_z = int(location[0])
-            location_y = int(location[1])
-            location_z += 224 / 2
-            location_y += 224 / 2
-            if not (0 <= location_z < 224 and 0 <= location_y < 224):
-                continue
-            if self._max_energy:
-                row[1, location_z, location_y] = min(int(math.floor(energy / self._max_energy * 256)), 255)
-            else:
-                row[0, location_z, location_y] = min(int(math.floor(energy / input_row[2] * 256)), 255)
+            location_z = int(location[0]) * 4
+            location_y = int(location[1]) * 4
+            for i in range(0, 4):
+                for j in range(0, 4):
+                    _location_z = location_z + 224 / 2 + i
+                    _location_y = location_y + 224 / 2 + j
+                    if not (0 <= _location_z < 224 and 0 <= _location_y < 224):
+                        continue
+                    if self._max_energy:
+                        row[1, _location_z, _location_y] = min(int(math.floor(energy / self._max_energy * 256)), 255)
+                    else:
+                        row[1, _location_z, _location_y] = min(int(math.floor(energy / input_row[2] * 256)), 255)
         return row
 
     def train_generator(self):
