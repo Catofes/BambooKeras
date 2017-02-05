@@ -69,9 +69,9 @@ class DataGenerator:
             if not (0 <= location_x < 224 and 0 <= location_y < 224):
                 continue
             if self._max_energy:
-                row[0, location_x, location_y] = int(math.floor(energy / self._max_energy * 256))
+                row[0, location_x, location_y] = min(int(math.floor(energy / self._max_energy * 256)), 255)
             else:
-                row[0, location_x, location_y] = int(math.floor(energy / row_max_energy * 256))
+                row[0, location_x, location_y] = min(int(math.floor(energy / row_max_energy * 256)), 255)
         cluster_zy_data = input_row[1]
         for pixel, energy in cluster_zy_data.items():
             location = pixel.split(":")
@@ -82,9 +82,9 @@ class DataGenerator:
             if not (0 <= location_z < 224 and 0 <= location_y < 224):
                 continue
             if self._max_energy:
-                row[1, location_z, location_y] = int(math.floor(energy / self._max_energy * 256))
+                row[1, location_z, location_y] = min(int(math.floor(energy / self._max_energy * 256)), 255)
             else:
-                row[0, location_x, location_y] = int(math.floor(energy / row_max_energy * 256))
+                row[0, location_z, location_y] = min(int(math.floor(energy / row_max_energy * 256)), 255)
         return row
 
     def train_generator(self):
