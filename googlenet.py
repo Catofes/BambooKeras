@@ -569,7 +569,7 @@ class Train:
             #     result = model.test_on_batch(row_x, [row_y, row_y, row_y])
             #     print("Test batch: ", result)
             model.fit_generator(generator=data.train_generator(), samples_per_epoch=data.get_train_size(), nb_epoch=1,
-                                validatison_data=data.test_generator(), nb_val_samples=data.get_test_size())
+                                validation_data=data.test_generator(), nb_val_samples=data.get_test_size())
             # print some predict:
             for i in range(100):
                 row_x, row_y = data.get_some_test(1)
