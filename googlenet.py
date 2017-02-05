@@ -21,7 +21,7 @@ class DataGenerator:
         data = json.loads(f.read())
         self._signal = data['signal']
         self._background = data['background']
-        self._max_energy = data['max_energy']
+        self._max_energy = None
         self._data = []
         if not background_signal_equivalent:
             print("Load %s signal, %s background" % (len(self._signal), len(self._background)))
@@ -45,6 +45,9 @@ class DataGenerator:
         self._train_pointer = 0
         self._test_pointer = 0
 
+    def set_max_energy(self, max_energy):
+        self._max_energy = max_energy
+
     def get_train_size(self):
         return len(self._train_data)
 
@@ -54,7 +57,7 @@ class DataGenerator:
     def get_batch_size(self):
         return self._batch_size
 
-    def _convert_row(self, input_row):
+    def _convert_row(self, input_row, row_max_energy):
         row = np.zeros((3, 224, 224))
         cluster_xy_data = input_row[0]
         for pixel, energy in cluster_xy_data.items():
@@ -65,7 +68,10 @@ class DataGenerator:
             location_y += 224 / 2
             if not (0 <= location_x < 224 and 0 <= location_y < 224):
                 continue
-            row[0, location_x, location_y] = int(math.floor(energy / self._max_energy * 256))
+            if self._max_energy:
+                row[0, location_x, location_y] = int(math.floor(energy / self._max_energy * 256))
+            else:
+                row[0, location_x, location_y] = int(math.floor(energy / row_max_energy * 256))
         cluster_zy_data = input_row[1]
         for pixel, energy in cluster_zy_data.items():
             location = pixel.split(":")
@@ -75,7 +81,10 @@ class DataGenerator:
             location_y += 224 / 2
             if not (0 <= location_z < 224 and 0 <= location_y < 224):
                 continue
-            row[1, location_z, location_y] = int(math.floor(energy / self._max_energy * 256))
+            if self._max_energy:
+                row[1, location_z, location_y] = int(math.floor(energy / self._max_energy * 256))
+            else:
+                row[0, location_x, location_y] = int(math.floor(energy / row_max_energy * 256))
         return row
 
     def train_generator(self):
@@ -92,7 +101,7 @@ class DataGenerator:
             result_x = np.zeros((count, 3, 224, 224), dtype='float32')
             result_y = np.zeros((count, 1000))
             for i, row in enumerate(data):
-                result_x[i] = self._convert_row(row[0])
+                result_x[i] = self._convert_row(row[0], row[2])
                 result_y[i][row[1]] = 1
             yield result_x, [result_y, result_y, result_y]
 
@@ -110,7 +119,7 @@ class DataGenerator:
             result_x = np.zeros((count, 3, 224, 224), dtype='float32')
             result_y = np.zeros((count, 1000))
             for i, row in enumerate(data):
-                result_x[i] = self._convert_row(row[0])
+                result_x[i] = self._convert_row(row[0], row[2])
                 result_y[i][row[1]] = 1
             yield result_x, [result_y, result_y, result_y]
 
@@ -119,7 +128,7 @@ class DataGenerator:
         result_y = np.zeros((size, 1000))
         for i in range(0, size):
             row = random.choice(self._test_data)
-            result_x[i] = self._convert_row(row[0])
+            result_x[i] = self._convert_row(row[0], row[2])
             result_y[i][row[1]] = 1
         return result_x, result_y
 
@@ -129,6 +138,10 @@ class Train:
         self.google_net = None
         self.exit_signal = False
         self.thread = None
+        self.data_generator = None
+
+    def set_data(self, input_data):
+        self.data_generator = DataGenerator(input_data)
 
     def create_googlenet(self, weights_path=None):
         # creates GoogLeNet a.k.a. Inception v1 (Szegedy, 2015)
@@ -475,7 +488,7 @@ class Train:
         preds = self.google_net.predict(x)
         return [np.argmax(preds[0]), np.argmax(preds[1]), np.argmax(preds[2])]
 
-    def test(self, input_data, input_network):
+    def test(self, input_network):
         model = self.create_googlenet(input_network)
         sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
         model.compile(optimizer=sgd, loss='categorical_crossentropy')
@@ -484,7 +497,9 @@ class Train:
         # data = json.loads(f.read())
         # signal = data['signal']
         # background = data['background']
-        data_generator = DataGenerator(input_data)
+        if not self.data_generator:
+            raise Exception("No data generator")
+        data_generator = self.data_generator
         print("Test Data")
         signal_signal = 0
         signal_background = 0
@@ -522,7 +537,7 @@ class Train:
         print("Signal\t%s\t%s" % (signal_signal, signal_background))
         print("Background\t%s\t%s" % (background_signal, background_background))
 
-    def train(self, input_data, save_path, recovery=None):
+    def train(self, save_path, recovery=None):
         if recovery:
             model = self.create_googlenet(recovery)
         else:
@@ -530,7 +545,9 @@ class Train:
         sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
         model.compile(optimizer=sgd, loss='categorical_crossentropy')
 
-        data = DataGenerator(input_data)
+        if not self.data_generator:
+            raise Exception("No data generator")
+        data = self.data_generator
         print("Start Train.")
         for i in range(0, 10000):
             if self.exit_signal:
@@ -576,12 +593,16 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--type", choices=["train", "test"])
     parser.add_argument("-i", "--input", required=True)
     parser.add_argument("-s", "--save", required=True)
-    parser.add_argument("-r", "--recovery")
+    parser.add_argument("-m", "--max-energy")
+    parser.add_argument("-r", "--recovery", action='store_true')
     args = parser.parse_args()
     if args.type == "train":
         signal.signal(signal.SIGINT, signal_handler)
+        t.set_data(args.input)
+        if args.max_energy:
+            t.data_generator.set_max_energy(args.max_energy)
         if args.recovery:
-            t.train(args.input, args.save, args.recovery)
+            t.train(args.save, args.recovery)
         else:
             t.train(args.input, args.save)
     else:
