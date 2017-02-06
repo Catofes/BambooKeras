@@ -571,7 +571,9 @@ class Train:
             #     result = model.test_on_batch(row_x, [row_y, row_y, row_y])
             #     print("Test batch: ", result)
             model.fit_generator(generator=data.train_generator(), samples_per_epoch=data.get_train_size(), nb_epoch=1,
-                                validation_data=data.test_generator(), nb_val_samples=data.get_test_size())
+                                validation_data=data.test_generator(), nb_val_samples=data.get_test_size(), verbose=1)
+            score = model.evaluate_generator(generator=data.test_generator(), val_samples=data.get_test_size())
+            print(score)
             # print some predict:
             for i in range(100):
                 row_x, row_y = data.get_some_test(1)
@@ -598,11 +600,11 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--max-energy", type=float)
     parser.add_argument("-r", "--recovery", action='store_true')
     args = parser.parse_args()
+    t.set_data(args.input)
+    if args.max_energy:
+        t.data_generator.set_max_energy(args.max_energy)
     if args.type == "train":
         signal.signal(signal.SIGINT, signal_handler)
-        t.set_data(args.input)
-        if args.max_energy:
-            t.data_generator.set_max_energy(args.max_energy)
         if args.recovery:
             t.train(args.save, args.recovery)
         else:
