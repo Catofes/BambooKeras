@@ -598,7 +598,7 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--input", required=True)
     parser.add_argument("-s", "--save", required=True)
     parser.add_argument("-m", "--max-energy", type=float)
-    parser.add_argument("-r", "--recovery", action='store_true')
+    parser.add_argument("-r", "--recovery")
     args = parser.parse_args()
     t.set_data(args.input)
     if args.max_energy:
