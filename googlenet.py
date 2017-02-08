@@ -142,6 +142,7 @@ class TestDataGenerator:
         self.test_data_percent = test_data_percent
         self._type = ["circle", "square"]
         self._train_pointer = 0
+        self._test_pointer = 0
         for i in range(0, count):
             type_ = random.choice(self._type)
             x = random.randint(0, 223)
