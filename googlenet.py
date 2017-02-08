@@ -135,6 +135,100 @@ class DataGenerator:
         return result_x, result_y
 
 
+class TestDataGenerator:
+    def __init__(self, count=100000, batch_size=128, test_data_percent=0.1):
+        self._data = []
+        self._batch_size = batch_size
+        self.test_data_percent = test_data_percent
+        self._type = ["circle", "square"]
+        self._train_pointer = 0
+        for i in range(0, count):
+            type_ = random.choice(self._type)
+            x = random.randint(0, 223)
+            y = random.randint(0, 223)
+            r = random.randint(0, 50)
+            self._data.append((type_, x, y, r))
+        random.shuffle(self._data)
+        split_at = int(math.floor(len(self._data) * (1 - test_data_percent)))
+        self._train_data = self._data[:split_at]
+        self._test_data = self._data[split_at:]
+
+    def get_train_size(self):
+        return len(self._train_data)
+
+    def get_test_size(self):
+        return len(self._test_data)
+
+    def _convert_row(self, input_row):
+        t_, x_, y_, r_ = input_row
+        row = np.zeros((3, 224, 224))
+        if t_ == "circle":
+            for i in range(0, 224):
+                for j in range(0, 224):
+                    if math.sqrt((i - x_) * (i - x_) + (j - y_) * (j - y_)) < r_:
+                        row[0, i, j] = 255
+        elif t_ == "square":
+            for i in range(0, 224):
+                for j in range(0, 224):
+                    if abs(i - x_) < r_ and abs(j - y_) < r_:
+                        row[0, i, j] = 255
+        return row
+
+    def train_generator(self):
+        while True:
+            start = self._train_pointer
+            end = self._train_pointer + self._batch_size
+            if end >= len(self._train_data):
+                end = len(self._train_data)
+                self._train_pointer = 0
+            else:
+                self._train_pointer = end
+            data = self._train_data[start:end]
+            count = len(data)
+            result_x = np.zeros((count, 3, 224, 224), dtype='float32')
+            result_y = np.zeros((count, 1000))
+            for i, row in enumerate(data):
+                result_x[i] = self._convert_row(row)
+                if row[0] == "circle":
+                    result_y[i][0] = 1
+                else:
+                    result_y[i][1] = 1
+            yield result_x, [result_y, result_y, result_y]
+
+    def test_generator(self):
+        while True:
+            start = self._test_pointer
+            end = self._test_pointer + self._batch_size
+            if end >= len(self._test_data):
+                end = len(self._test_data)
+                self._test_pointer = 0
+            else:
+                self._test_pointer = end
+            data = self._test_data[start:end]
+            count = len(data)
+            result_x = np.zeros((count, 3, 224, 224), dtype='float32')
+            result_y = np.zeros((count, 1000))
+            for i, row in enumerate(data):
+                result_x[i] = self._convert_row(row)
+                if row[0] == "circle":
+                    result_y[i][0] = 1
+                else:
+                    result_y[i][1] = 1
+            yield result_x, [result_y, result_y, result_y]
+
+    def get_some_test(self, size):
+        result_x = np.zeros((size, 3, 224, 224), dtype='float32')
+        result_y = np.zeros((size, 1000))
+        for i in range(0, size):
+            row = random.choice(self._test_data)
+            result_x[i] = self._convert_row(row)
+            if row[0] == "circle":
+                result_y[i][0] = 1
+            else:
+                result_y[i][1] = 1
+        return result_x, result_y
+
+
 class Train:
     def __init__(self):
         self.google_net = None
@@ -143,7 +237,8 @@ class Train:
         self.data_generator = None
 
     def set_data(self, input_data):
-        self.data_generator = DataGenerator(input_data)
+        # self.data_generator = DataGenerator(input_data)
+        self.data_generator = TestDataGenerator()
 
     def create_googlenet(self, weights_path=None):
         # creates GoogLeNet a.k.a. Inception v1 (Szegedy, 2015)
@@ -486,19 +581,14 @@ class Train:
         self.google_net = googlenet
         return googlenet
 
-    def predict(self, x):
+    def predict_googlenet(self, x):
         preds = self.google_net.predict(x)
         return [np.argmax(preds[0]), np.argmax(preds[1]), np.argmax(preds[2])]
 
-    def test(self, input_network):
+    def test_googlenet(self, input_network):
         model = self.create_googlenet(input_network)
         sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
         model.compile(optimizer=sgd, loss='categorical_crossentropy')
-        # print("Load Data.")
-        # f = open(input_data, "r")
-        # data = json.loads(f.read())
-        # signal = data['signal']
-        # background = data['background']
         if not self.data_generator:
             raise Exception("No data generator")
         data_generator = self.data_generator
@@ -539,7 +629,7 @@ class Train:
         print("Signal\t%s\t%s" % (signal_signal, signal_background))
         print("Background\t%s\t%s" % (background_signal, background_background))
 
-    def train(self, save_path, recovery=None):
+    def train_googlenet(self, save_path, recovery=None):
         if recovery:
             model = self.create_googlenet(recovery)
         else:
@@ -556,20 +646,6 @@ class Train:
                 break
             print("=" * 64)
             print("Loop %s" % i)
-            # # Train
-            # samples_per_epoch = data.get_train_size()
-            # while samples_per_epoch > 0:
-            #     row_x, row_y = data.train_generator()
-            #     samples_per_epoch -= len(row_x)
-            #     result = model.train_on_batch(row_x, [row_y, row_y, row_y])
-            #     print("Train batch: ", result)
-            # # Test
-            # test_per_epoch = data.get_test_size()
-            # while test_per_epoch > 0:
-            #     row_x, row_y = data.test_generator()
-            #     test_per_epoch -= len(row_x)
-            #     result = model.test_on_batch(row_x, [row_y, row_y, row_y])
-            #     print("Test batch: ", result)
             model.fit_generator(generator=data.train_generator(), samples_per_epoch=data.get_train_size(), nb_epoch=1,
                                 validation_data=data.test_generator(), nb_val_samples=data.get_test_size(), verbose=1)
             score = model.evaluate_generator(generator=data.test_generator(), val_samples=data.get_test_size())
@@ -577,7 +653,7 @@ class Train:
             # print some predict:
             for i in range(100):
                 row_x, row_y = data.get_some_test(1)
-                predict = self.predict(row_x)
+                predict = self.predict_googlenet(row_x)
                 print('Except', [np.argmax(row_y), np.argmax(row_y), np.argmax(row_y)])
                 print('Answer', predict)
                 print('---')
@@ -606,8 +682,8 @@ if __name__ == "__main__":
     if args.type == "train":
         signal.signal(signal.SIGINT, signal_handler)
         if args.recovery:
-            t.train(args.save, args.recovery)
+            t.train_googlenet(args.save, args.recovery)
         else:
-            t.train(args.save)
+            t.train_googlenet(args.save)
     else:
-        t.test(args.save)
+        t.test_googlenet(args.save)
