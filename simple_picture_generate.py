@@ -32,12 +32,14 @@ class Generator:
 
     def generate(self):
         count = 0
-        while True:
+        flag = True
+        while flag:
             result_x, result_y = next(self.data)
             for i in range(0, 128):
                 if count % 1000 == 0:
                     print("%s/%s" % (count, self.number))
                 if count > self.number:
+                    flag = False
                     break
                 count += 1
                 picture = result_x[i]
